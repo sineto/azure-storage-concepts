@@ -47,8 +47,7 @@ resource "azurerm_linux_virtual_machine" "vmachine" {
 
   size                  = "Standard_B1s"
   network_interface_ids = [azurerm_network_interface.nic_vm[count.index].id]
-
-  admin_username = "azureuser"
+  admin_username        = "azureuser"
 
   admin_ssh_key {
     username   = "azureuser"
@@ -66,6 +65,32 @@ resource "azurerm_linux_virtual_machine" "vmachine" {
     sku       = "18.04-LTS"
     version   = "latest"
   }
+}
+
+resource "azurerm_virtual_machine_extension" "vmachine_extension" {
+  count              = 2
+  name               = azurerm_linux_virtual_machine.vmachine[count.index].computer_name
+  virtual_machine_id = azurerm_linux_virtual_machine.vmachine[count.index].id
+
+  # az vm extension image list --location westus -o table
+  publisher            = "Microsoft.Azure.Extensions"
+  type                 = "CustomScript"
+  type_handler_version = "2.1"
+
+  settings = <<SETTINGS
+  {
+    "script": "${base64encode(templatefile("./files/mount_file_share.sh", {
+  storage_account_name = "${azurerm_storage_account.storage_acc.name}",
+  storage_account_key  = "${azurerm_storage_account.storage_acc.primary_access_key}",
+  file_share_name      = "${azurerm_storage_share.storage_file_share.name}"
+}))}"
+  }
+SETTINGS
+
+depends_on = [
+  azurerm_storage_account.storage_acc,
+  azurerm_storage_share.storage_file_share
+]
 }
 
 resource "azurerm_storage_account" "storage_acc" {
